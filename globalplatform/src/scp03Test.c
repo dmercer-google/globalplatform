@@ -448,11 +448,13 @@ static void calculate_pseudo_random_challenge(void **state) {
 	OPGP_ERROR_STATUS status;
 	BYTE hostChallenge[8];
 	DWORD hostChallengeLen = 8;
-	BYTE initializeUpdateRequest[APDU_COMMAND_LEN], extAuthRequest[APDU_COMMAND_LEN];
+	BYTE initializeUpdateRequest[APDU_COMMAND_LEN];
 	DWORD initializeUpdateRequestLen, extAuthRequestLen;
 	initializeUpdateRequestLen = extAuthRequestLen = APDU_COMMAND_LEN;
 	BYTE initializeUpdateResponse[APDU_RESPONSE_LEN];
 	DWORD initializeUpdateResponseLen = APDU_RESPONSE_LEN;
+
+	BYTE key[] = {0xDE, 0x2A, 0x36, 0x29, 0xCB, 0xC2, 0x4E, 0x8D, 0x88, 0x69, 0xE8, 0x2C, 0x8B, 0x4C, 0x0D, 0x87, 0x4D, 0x88, 0x16, 0x6B, 0x6F, 0x8A, 0x1C, 0x12};
 
 	BYTE sequenceCounter[3];
 	BYTE cardChallenge[8];
@@ -469,7 +471,7 @@ static void calculate_pseudo_random_challenge(void **state) {
 	memcpy(cardChallenge, initializeUpdateResponse+13, 8);
 	memcpy(sequenceCounter, initializeUpdateResponse+29, 3);
 
-	status = calculate_card_challenge_SCP03(OPGP_VISA_DEFAULT_KEY, sequenceCounter, securityInfo211.invokingAid,
+	status = calculate_card_challenge_SCP03(key, sizeof(key), sequenceCounter, securityInfo211.invokingAid,
 			securityInfo211.invokingAidLength, calculatedCardChallenge);
 	assert_int_equal(status.errorStatus, OPGP_ERROR_STATUS_SUCCESS);
 	assert_memory_equal(calculatedCardChallenge, cardChallenge, 8);

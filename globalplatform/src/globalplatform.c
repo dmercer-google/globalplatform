@@ -4376,7 +4376,7 @@ OPGP_ERROR_STATUS mutual_authentication(OPGP_CARD_CONTEXT cardContext, OPGP_CARD
 				memcpy(secInfo->invokingAid, GP231_ISD_AID, sizeof(GP231_ISD_AID));
 				secInfo->invokingAidLength = sizeof(GP231_ISD_AID);
 			}
-			status = calculate_card_challenge_SCP03(sEnc, sequenceCounter, secInfo->invokingAid, secInfo->invokingAidLength, calculatedCardChallenge);
+			status = calculate_card_challenge_SCP03(sEnc, 16, sequenceCounter, secInfo->invokingAid, secInfo->invokingAidLength, calculatedCardChallenge);
 			if (OPGP_ERROR_CHECK(status)) {
 				goto end;
 			}

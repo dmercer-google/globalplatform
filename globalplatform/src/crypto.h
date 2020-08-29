@@ -115,7 +115,8 @@ OPGP_ERROR_STATUS create_session_key_SCP03(BYTE key[16], BYTE derivationConstant
 							   BYTE hostChallenge[8], BYTE sessionKey[16]);
 
 OPGP_NO_API
-OPGP_ERROR_STATUS calculate_card_challenge_SCP03(BYTE S_ENC[16],
+OPGP_ERROR_STATUS calculate_card_challenge_SCP03(BYTE S_ENC[32],
+											DWORD keyLength,
 											BYTE sequenceCounter[3],
 											PBYTE invokingAID,
 											DWORD invokingAIDLength,

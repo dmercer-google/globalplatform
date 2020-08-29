@@ -70,22 +70,23 @@ OPGP_ERROR_STATUS calculate_enc_cbc(BYTE key[16], BYTE *message, DWORD messageLe
 							  BYTE *encryption, DWORD *encryptionLength);
 
 OPGP_NO_API
-OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[16], BYTE *message, DWORD messageLength, BYTE mac[16]);
+OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[16], DWORD keyLength, BYTE *message, DWORD messageLength, BYTE mac[16]);
 
 /**
     * Calculates the a cryptogram for multiple SCP03 operation like host cryptogram, card cryptogram and card challenge calculation.
     *
-    * \param key The AES key to use for the calculation.
-    * \param derivationConstant The derivation constant for the key derivation function.
-    * \param context1 The context1 for the internal key derivation.
-	* \param context1Length The length of the context1 buffer.
-    * \param context2 The context2 for the internal key derivation.
-	* \param context2Length The length of the context3 buffer.
+    * \param key [in] The AES key to use for the calculation.
+    * \param keyLength [in] The AES key length in bytes (16, 24, or 32).
+    * \param derivationConstant [in] The derivation constant for the key derivation function.
+    * \param context1 [in] The context1 for the internal key derivation.
+	* \param context1Length [in] The length of the context1 buffer.
+    * \param context2 [in] The context2 for the internal key derivation.
+	* \param context2Length [in] The length of the context3 buffer.
 	* \param cryptogram [out] The calculated cryptogram. Must be large enough to hold the result. For session keys this is 128 bits, 64 bits otherwise.
     * \param cryptogramSize [in] The result size in bits of the cryptogram. Must be a multiple of 8.
     * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
     */
-OPGP_ERROR_STATUS calculate_cryptogram_SCP03(BYTE key[16], const BYTE derivationConstant, PBYTE context1, DWORD context1Length,
+OPGP_ERROR_STATUS calculate_cryptogram_SCP03(BYTE key[32], DWORD keyLength, const BYTE derivationConstant, PBYTE context1, DWORD context1Length,
 	PBYTE context2, DWORD context2Length, PBYTE cryptogram, DWORD cryptogramSize) {
 		OPGP_ERROR_STATUS status;
 		BYTE derivationData[48];
@@ -118,7 +119,7 @@ OPGP_ERROR_STATUS calculate_cryptogram_SCP03(BYTE key[16], const BYTE derivation
 		memcpy(derivationData + 16, context1, context1Length);
 		memcpy(derivationData + 16 + context1Length, context2, context2Length);
 
-		status = calculate_MAC_aes(key, derivationData, derivationDatLength, mac);
+		status = calculate_MAC_aes(key, keyLength, derivationData, derivationDatLength, mac);
 		if (OPGP_ERROR_CHECK(status)) {
 			goto end;
 		}
@@ -559,7 +560,7 @@ OPGP_ERROR_STATUS calculate_card_cryptogram_SCP03(BYTE S_MACSessionKey[16],
 {
 	OPGP_ERROR_STATUS status;
 	OPGP_LOG_START(_T("calculate_card_cryptogram_SCP03"));
-	status = calculate_cryptogram_SCP03(S_MACSessionKey, 0x00, hostChallenge, 8, cardChallenge, 8, cardCryptogram, 64);
+	status = calculate_cryptogram_SCP03(S_MACSessionKey, 16, 0x00, hostChallenge, 8, cardChallenge, 8, cardCryptogram, 64);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -574,13 +575,15 @@ end:
 /**
  * Calculates the card challenge when using pseudo-random challenge generation for SCP03.
  * \param S_ENC [in] The static S-ENC Key.
+ * \param keyLength [in] The key length in bytes (16, 24 or 32).
  * \param sequenceCounter [in] The sequence counter.
  * \param invokingAID The invoking AID byte buffer.
  * \param invokingAIDLength The length of the invoking AID byte buffer.
  * \param cardChallenge [out] The calculated challenge.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_card_challenge_SCP03(BYTE S_ENC[16],
+OPGP_ERROR_STATUS calculate_card_challenge_SCP03(BYTE S_ENC[32],
+											DWORD keyLength,
 											BYTE sequenceCounter[3],
 											PBYTE invokingAID,
 											DWORD invokingAIDLength,
@@ -588,7 +591,7 @@ OPGP_ERROR_STATUS calculate_card_challenge_SCP03(BYTE S_ENC[16],
 {
 	OPGP_ERROR_STATUS status;
 	OPGP_LOG_START(_T("calculate_card_challenge_SCP03"));
-	status = calculate_cryptogram_SCP03(S_ENC, 0x02, sequenceCounter, 3, invokingAID, invokingAIDLength, cardChallenge, 64);
+	status = calculate_cryptogram_SCP03(S_ENC, keyLength, 0x02, sequenceCounter, 3, invokingAID, invokingAIDLength, cardChallenge, 64);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -674,7 +677,7 @@ OPGP_ERROR_STATUS calculate_host_cryptogram_SCP03(BYTE S_MACSessionKey[16],
 {
 	OPGP_ERROR_STATUS status;
 	OPGP_LOG_START(_T("calculate_host_cryptogram_SCP03"));
-	status = calculate_cryptogram_SCP03(S_MACSessionKey, 0x01, hostChallenge, 8, cardChallenge, 8, hostCryptogram, 64);
+	status = calculate_cryptogram_SCP03(S_MACSessionKey, 16, 0x01, hostChallenge, 8, cardChallenge, 8, hostCryptogram, 64);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -766,7 +769,7 @@ OPGP_ERROR_STATUS create_session_key_SCP03(BYTE key[16], BYTE derivationConstant
 							   BYTE hostChallenge[8], BYTE sessionKey[16]) {
 	OPGP_ERROR_STATUS status;
 	OPGP_LOG_START(_T("create_session_key_SCP03"));
-	status = calculate_cryptogram_SCP03(key, derivationConstant, hostChallenge, 8, cardChallenge, 8, sessionKey, 128);
+	status = calculate_cryptogram_SCP03(key, 16, derivationConstant, hostChallenge, 8, cardChallenge, 8, sessionKey, 128);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -961,20 +964,23 @@ end:
 
 /**
  * Calculates a message authentication code, using AES-128 in CBC mode. This is the algorithm specified in NIST 800-38B.
- * \param key [in] The AES-128 key to use.
+ * \param key [in] The AES key to use.
+ * \param keyLength [in] The AES key length in bytes (16, 24, or 32).
  * \param *message [in] The message to calculate the MAC for.
  * \param messageLength [in] The message length.
  * \param mac [out] The calculated MAC.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[16], BYTE *message, DWORD messageLength, BYTE mac[16]) {
+OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[32], DWORD keyLength, BYTE *message, DWORD messageLength, BYTE mac[32]) {
 	LONG result;
 	OPGP_ERROR_STATUS status;
 	size_t outl;
 	CMAC_CTX *ctx = CMAC_CTX_new();
 	OPGP_LOG_START(_T("calculate_MAC_aes"));
 
-	result = CMAC_Init(ctx, key, 16, EVP_aes_128_cbc(), NULL);
+	result = CMAC_Init(ctx, key, keyLength,
+			keyLength == 16 ? EVP_aes_128_cbc() :
+					(keyLength == 24 ? EVP_aes_192_cbc() : EVP_aes_256_cbc()), NULL);
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
