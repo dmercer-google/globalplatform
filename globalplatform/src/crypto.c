@@ -147,14 +147,15 @@ end:
  * \param mac [out] The full 16 Byte MAC. Append the first 8 Bytes to the
  *                  message. Save the full 16 Bytes for further MAC generation if needed.
  */
-OPGP_ERROR_STATUS calculate_CMAC_aes(BYTE sMacKey[16], BYTE *message, DWORD messageLength, BYTE chainingValue[16], BYTE mac[16]) {
+OPGP_ERROR_STATUS calculate_CMAC_aes(BYTE sMacKey[32], DWORD keyLength, BYTE *message, DWORD messageLength, BYTE chainingValue[16], BYTE mac[16]) {
 	LONG result;
 	OPGP_ERROR_STATUS status;
 	size_t outl;
 	CMAC_CTX *ctx = CMAC_CTX_new();
 	OPGP_LOG_START(_T("calculate_CMAC_aes"));
 
-	result = CMAC_Init(ctx, sMacKey, 16, EVP_aes_128_cbc(), NULL);
+	result = CMAC_Init(ctx, sMacKey, keyLength, keyLength == 16 ? EVP_aes_128_cbc() :
+			(keyLength == 24 ? EVP_aes_192_cbc() : EVP_aes_256_cbc()), NULL);
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -226,6 +227,7 @@ end:
 /**
  * Calculates the encryption of a message in CBC mode for SCP03 using AES with no padding if not needed.
  * \param key [in] An AES key used to encrypt.
+ * \param keyLength [in] The key length. 16, 24 or 32 bytes.
  * \param *message [in] The message to encrypt.
  * \param messageLength [in] The length of the message.
  * \param icv [in] The ICV to use.
@@ -233,7 +235,8 @@ end:
  * \param *encryptionLength [out] The length of the encryption.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_enc_cbc_SCP03_min_padding(BYTE key[16], BYTE *message, DWORD messageLength,
+OPGP_ERROR_STATUS calculate_enc_cbc_SCP03_min_padding(BYTE key[32], DWORD keyLength,
+		BYTE *message, DWORD messageLength,
 							  BYTE icv[16],
 							  BYTE *encryption, DWORD *encryptionLength) {
 	OPGP_ERROR_STATUS status;
@@ -245,7 +248,8 @@ OPGP_ERROR_STATUS calculate_enc_cbc_SCP03_min_padding(BYTE key[16], BYTE *messag
 	EVP_CIPHER_CTX_init(ctx);
 	*encryptionLength = 0;
 
-	result = EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, icv);
+	result = EVP_EncryptInit_ex(ctx, keyLength == 16 ? EVP_aes_128_cbc() :
+			(keyLength == 24 ? EVP_aes_192_cbc() : EVP_aes_256_cbc()), NULL, key, icv);
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -255,7 +259,7 @@ OPGP_ERROR_STATUS calculate_enc_cbc_SCP03_min_padding(BYTE key[16], BYTE *messag
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
 	*encryptionLength += outl;
-	result = EVP_EncryptUpdate(ctx, encryption + *encryptionLength, &outl, AES_PADDING, ((16 - (messageLength % 16)) % 16));
+	result = EVP_EncryptUpdate(ctx, encryption + *encryptionLength, &outl, AES_PADDING, ((keyLength - (messageLength % keyLength)) % 16));
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -275,8 +279,9 @@ end:
 
 /**
  * Calculates the encryption of a message in CBC mode for SCP03 using AES.
- * Pads the message with 0x80 and additional 0x00 until message length is a multiple of 16.
+ * Pads the message with 0x80 and additional 0x00 until message length is a multiple of the block size.
  * \param key [in] An AES key used to encrypt.
+ * \param keyLength [in] The key length. 16, 24 or 32 bytes.
  * \param *message [in] The message to encrypt.
  * \param messageLength [in] The length of the message.
  * \param icv [in] The ICV to use.
@@ -284,8 +289,8 @@ end:
  * \param *encryptionLength [out] The length of the encryption.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_enc_cbc_SCP03(BYTE key[16], BYTE *message, DWORD messageLength,
-							  BYTE icv[16],
+OPGP_ERROR_STATUS calculate_enc_cbc_SCP03(BYTE key[32], DWORD keyLength, BYTE *message, DWORD messageLength,
+							  BYTE icv[32],
 							  BYTE *encryption, DWORD *encryptionLength) {
 	OPGP_ERROR_STATUS status;
 	int result;
@@ -296,7 +301,8 @@ OPGP_ERROR_STATUS calculate_enc_cbc_SCP03(BYTE key[16], BYTE *message, DWORD mes
 	EVP_CIPHER_CTX_init(ctx);
 	*encryptionLength = 0;
 
-	result = EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, icv);
+	result = EVP_EncryptInit_ex(ctx, keyLength == 16 ? EVP_aes_128_cbc() :
+			(keyLength == 24 ? EVP_aes_192_cbc() : EVP_aes_256_cbc()), NULL, key, icv);
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -306,7 +312,7 @@ OPGP_ERROR_STATUS calculate_enc_cbc_SCP03(BYTE key[16], BYTE *message, DWORD mes
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
 	*encryptionLength += outl;
-	result = EVP_EncryptUpdate(ctx, encryption + *encryptionLength, &outl, AES_PADDING, (16 - messageLength % 16));
+	result = EVP_EncryptUpdate(ctx, encryption + *encryptionLength, &outl, AES_PADDING, (keyLength - messageLength % keyLength));
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -329,6 +335,7 @@ end:
  * Calculates the decryption of a message in CBC mode for SCP03 using AES.
  * Pads the message with 0x80 and additional 0x00 until message length is a multiple of 16.
  * \param key [in] An AES key used to decrypt.
+ * \param keyLength [in] The key length. 16, 24 or 32 bytes.
  * \param *message [in] The message to decrypt.
  * \param messageLength [in] The length of the message.
  * \param icv [in] The ICV to use.
@@ -336,8 +343,8 @@ end:
  * \param *decryptionLength [out] The length of the encryption.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_dec_cbc_SCP03(BYTE key[16], BYTE *message, DWORD messageLength,
-							  BYTE icv[16],
+OPGP_ERROR_STATUS calculate_dec_cbc_SCP03(BYTE key[32], DWORD keyLength, BYTE *message, DWORD messageLength,
+							  BYTE icv[32],
 							  BYTE *decryption, DWORD *decryptionLength) {
 	OPGP_ERROR_STATUS status;
 	int result;
@@ -348,7 +355,8 @@ OPGP_ERROR_STATUS calculate_dec_cbc_SCP03(BYTE key[16], BYTE *message, DWORD mes
 	EVP_CIPHER_CTX_init(ctx);
 	*decryptionLength = 0;
 
-	result = EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, icv);
+	result = EVP_DecryptInit_ex(ctx, keyLength == 16 ? EVP_aes_128_cbc() :
+			(keyLength == 24 ? EVP_aes_192_cbc() : EVP_aes_256_cbc()), NULL, key, icv);
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -358,7 +366,7 @@ OPGP_ERROR_STATUS calculate_dec_cbc_SCP03(BYTE key[16], BYTE *message, DWORD mes
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
 	*decryptionLength += outl;
-	result = EVP_DecryptUpdate(ctx, decryption + *decryptionLength, &outl, AES_PADDING, (16 - messageLength % 16));
+	result = EVP_DecryptUpdate(ctx, decryption + *decryptionLength, &outl, AES_PADDING, (keyLength - messageLength % keyLength));
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -380,36 +388,38 @@ end:
 /**
  * Calculates the encryption ICV for SCP03 using AES.
  * \param key [in] An AES key used to encrypt.
+ * \param keyLength [in] The key length. 16, 24 or 32 bytes.
  * \param sessionEncryptionCounter [in] The session encryption counter.
- * \param *icv [out] The ICV to use.
+ * \param icv [out] The ICV to use.
  * \param forResponse 1 if the calculation is performed for the response.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_enc_icv_SCP03(BYTE key[16], LONG sessionEncryptionCounter, BYTE *icv, BOOL forResponse) {
+OPGP_ERROR_STATUS calculate_enc_icv_SCP03(BYTE key[32], DWORD keyLength, LONG sessionEncryptionCounter, BYTE icv[32], BOOL forResponse) {
 	OPGP_ERROR_STATUS status;
 	int result;
 	int outl;
 	EVP_CIPHER_CTX_define;
-	BYTE encryptionCounter[16];
+	BYTE encryptionCounter[32];
 	OPGP_LOG_START(_T("calculate_enc_icv_SCP03"));
 	ctx = EVP_CIPHER_CTX_create;
 	EVP_CIPHER_CTX_init(ctx);
 
-	result = EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, icv);
+	result = EVP_EncryptInit_ex(ctx, keyLength == 16 ? EVP_aes_128_cbc() :
+			(keyLength == 24 ? EVP_aes_192_cbc() : EVP_aes_256_cbc()), NULL, key, icv);
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
 	EVP_CIPHER_CTX_set_padding(ctx, 0);
-	memset(encryptionCounter, 0, 16);
-	encryptionCounter[12] = (int)((sessionEncryptionCounter >> 24) & 0xFF) ;
-	encryptionCounter[13] = (int)((sessionEncryptionCounter >> 16) & 0xFF) ;
-	encryptionCounter[14] = (int)((sessionEncryptionCounter >> 8) & 0XFF);
-	encryptionCounter[15] = (int)((sessionEncryptionCounter & 0XFF));
+	memset(encryptionCounter, 0, keyLength);
+	encryptionCounter[keyLength-4] = (int)((sessionEncryptionCounter >> 24) & 0xFF) ;
+	encryptionCounter[keyLength-3] = (int)((sessionEncryptionCounter >> 16) & 0xFF) ;
+	encryptionCounter[keyLength-2] = (int)((sessionEncryptionCounter >> 8) & 0XFF);
+	encryptionCounter[keyLength-1] = (int)((sessionEncryptionCounter & 0XFF));
 	if (forResponse) {
-		encryptionCounter[12] |= 0x80;
+		encryptionCounter[keyLength-4] |= 0x80;
 	}
 
-	result = EVP_EncryptUpdate(ctx, icv, &outl, encryptionCounter, 16);
+	result = EVP_EncryptUpdate(ctx, icv, &outl, encryptionCounter, keyLength);
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -548,19 +558,21 @@ end:
 /**
  * Calculates the card cryptogram for SCP03.
  * \param S_MACSessionKey [in] The S-MAC Session Key for calculating the card cryptogram.
+ * \param keyLength [in] The key length in bytes (16, 24 or 32).
  * \param cardChallenge [in] The card challenge.
  * \param hostChallenge [in] The host challenge.
  * \param cardCryptogram [out] The calculated host cryptogram.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_card_cryptogram_SCP03(BYTE S_MACSessionKey[16],
+OPGP_ERROR_STATUS calculate_card_cryptogram_SCP03(BYTE S_MACSessionKey[32],
+											DWORD keyLength,
 											BYTE cardChallenge[8],
 											BYTE hostChallenge[8],
 											BYTE cardCryptogram[8])
 {
 	OPGP_ERROR_STATUS status;
 	OPGP_LOG_START(_T("calculate_card_cryptogram_SCP03"));
-	status = calculate_cryptogram_SCP03(S_MACSessionKey, 16, 0x00, hostChallenge, 8, cardChallenge, 8, cardCryptogram, 64);
+	status = calculate_cryptogram_SCP03(S_MACSessionKey, keyLength, 0x00, hostChallenge, 8, cardChallenge, 8, cardCryptogram, 64);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -665,19 +677,21 @@ end:
 /**
  * Calculates the host cryptogram for SCP03.
  * \param S_MACSessionKey [in] The S-MAC Session Key for calculating the card cryptogram.
+ * \param keyLength [in] The key length in bytes (16, 24 or 32).
  * \param cardChallenge [in] The card challenge.
  * \param hostChallenge [in] The host challenge.
  * \param hostCryptogram [out] The calculated host cryptogram.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_host_cryptogram_SCP03(BYTE S_MACSessionKey[16],
+OPGP_ERROR_STATUS calculate_host_cryptogram_SCP03(BYTE S_MACSessionKey[32],
+											DWORD keyLength,
 											BYTE cardChallenge[8],
 											BYTE hostChallenge[8],
 											BYTE hostCryptogram[8])
 {
 	OPGP_ERROR_STATUS status;
 	OPGP_LOG_START(_T("calculate_host_cryptogram_SCP03"));
-	status = calculate_cryptogram_SCP03(S_MACSessionKey, 16, 0x01, hostChallenge, 8, cardChallenge, 8, hostCryptogram, 64);
+	status = calculate_cryptogram_SCP03(S_MACSessionKey, keyLength, 0x01, hostChallenge, 8, cardChallenge, 8, hostCryptogram, 64);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -759,17 +773,18 @@ end:
  * Creates an AES-128 session key for SCP03.
  * \param key [in] The Secure Channel Encryption Key or Secure Channel Message
  * Authentication Code Key for calculating the corresponding session key.
+ * \param keyLength [in] The key length. 16, 24 or 32 bytes.
  * \param derivationConstant [in] The derivation constant, as defined in "Table 4-1: Data derivation constants" of SCP03.
  * \param cardChallenge [in] The card challenge.
  * \param hostChallenge [in] The host challenge.
  * \param sessionKey [out] The calculated AES session key.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS create_session_key_SCP03(BYTE key[16], BYTE derivationConstant, BYTE cardChallenge[8],
-							   BYTE hostChallenge[8], BYTE sessionKey[16]) {
+OPGP_ERROR_STATUS create_session_key_SCP03(BYTE key[32], DWORD keyLength, BYTE derivationConstant, BYTE cardChallenge[8],
+							   BYTE hostChallenge[8], BYTE sessionKey[32]) {
 	OPGP_ERROR_STATUS status;
 	OPGP_LOG_START(_T("create_session_key_SCP03"));
-	status = calculate_cryptogram_SCP03(key, 16, derivationConstant, hostChallenge, 8, cardChallenge, 8, sessionKey, 128);
+	status = calculate_cryptogram_SCP03(key, keyLength, derivationConstant, hostChallenge, 8, cardChallenge, 8, sessionKey, keyLength);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -1214,12 +1229,13 @@ end:
  * \param validationData [in] The data used to validate the returned receipt.
  * \param validationDataLength [in] The length of the validationData buffer.
  * \param receipt [in] The receipt.
- * \param receiptKey [in] The 3DES key to generate the receipt.
+ * \param receiptKey [in] The 3DES or AES key to generate the receipt.
+ * \param keyLength [in] The key length. 16, 24 or 32 bytes.
  * \param secureChannelProtocol [in] The Secure Channel Protocol.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
 OPGP_ERROR_STATUS validate_receipt(PBYTE validationData, DWORD validationDataLength,
-							 BYTE receipt[16], BYTE receiptKey[16], BYTE secureChannelProtocol)
+							 BYTE receipt[16], BYTE receiptKey[32], DWORD keyLength, BYTE secureChannelProtocol)
 {
 	OPGP_ERROR_STATUS status;
 	BYTE mac[16];
@@ -1229,7 +1245,7 @@ OPGP_ERROR_STATUS validate_receipt(PBYTE validationData, DWORD validationDataLen
 		status = calculate_MAC_des_3des(receiptKey, validationData, validationDataLength, (PBYTE)ICV, mac);
 	}
 	else if (secureChannelProtocol == GP211_SCP03) {
-		status = calculate_CMAC_aes(receiptKey, validationData, validationDataLength, NULL, mac);
+		status = calculate_CMAC_aes(receiptKey, keyLength, validationData, validationDataLength, NULL, mac);
 		receiptLength = 16;
 	}
 	else {
@@ -1252,7 +1268,7 @@ end:
 
 OPGP_ERROR_STATUS validate_delete_receipt(DWORD confirmationCounter, PBYTE cardUniqueData,
 							 DWORD cardUniqueDataLength,
-						   BYTE receiptKey[16], GP211_RECEIPT_DATA receiptData,
+						   BYTE receiptKey[32], DWORD keyLength, GP211_RECEIPT_DATA receiptData,
 						   PBYTE AID, DWORD AIDLength, BYTE secureChannelProtocol)
 {
 	OPGP_ERROR_STATUS status;
@@ -1276,7 +1292,7 @@ OPGP_ERROR_STATUS validate_delete_receipt(DWORD confirmationCounter, PBYTE cardU
 	validationData[i++] = (BYTE)AIDLength;
 	memcpy(validationData, AID, AIDLength);
 	i+=AIDLength;
-	status = validate_receipt(validationData, validationDataLength, receiptData.receipt, receiptKey, secureChannelProtocol);
+	status = validate_receipt(validationData, validationDataLength, receiptData.receipt, receiptKey, keyLength, secureChannelProtocol);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -1314,7 +1330,7 @@ OPGP_ERROR_STATUS encrypt_sensitive_data(GP211_SECURITY_INFO *secInfo,
 		status = calculate_enc_cbc_SCP02(secInfo->dataEncryptionSessionKey, data, dataLength, encryptedData, encryptedDataLength);
 	}
 	else if (secInfo->secureChannelProtocol == GP211_SCP03) {
-		status = calculate_enc_cbc_SCP03_min_padding(secInfo->dataEncryptionSessionKey, data, dataLength, (PBYTE)SCP03_ICV, encryptedData, encryptedDataLength);
+		status = calculate_enc_cbc_SCP03_min_padding(secInfo->dataEncryptionSessionKey, secInfo->keyLength, data, dataLength, (PBYTE)SCP03_ICV, encryptedData, encryptedDataLength);
 	}
 	else {
 		// same for SCP01 and SCP02 in explicit mode
@@ -1456,7 +1472,7 @@ OPGP_ERROR_STATUS wrap_command(PBYTE apduCommand, DWORD apduCommandLength, PBYTE
 	BYTE caseAPDU;
 	BYTE C_MAC_ICV[8];
 	DWORD C_MAC_ICVLength = 8;
-	BYTE ENC_ICV[16] = {0};
+	BYTE ENC_ICV[32] = {0};
 	// padding is only needed for encryption
 	DWORD paddingSize = 0;
 	DWORD blockSize = 8;
@@ -1504,7 +1520,7 @@ OPGP_ERROR_STATUS wrap_command(PBYTE apduCommand, DWORD apduCommandLength, PBYTE
 			) {
 
 		if (secInfo->secureChannelProtocol == GP211_SCP03) {
-			blockSize = 16;
+			blockSize = secInfo->keyLength;
 		}
 		// compute size of APDU with enc padding + MAC
 		// padding 0x80 at least added or in SCP a length byte is prepended
@@ -1591,12 +1607,12 @@ OPGP_ERROR_STATUS wrap_command(PBYTE apduCommand, DWORD apduCommandLength, PBYTE
 				|| secInfo->securityLevel == GP211_SCP03_SECURITY_LEVEL_C_DEC_C_MAC_R_MAC
 				|| secInfo->securityLevel == GP211_SCP03_SECURITY_LEVEL_C_DEC_R_ENC_C_MAC_R_MAC) {
 			if (caseAPDU != 1 && caseAPDU != 2) {
-				status = calculate_enc_icv_SCP03(secInfo->encryptionSessionKey,
+				status = calculate_enc_icv_SCP03(secInfo->encryptionSessionKey, secInfo->keyLength,
 						secInfo->sessionEncryptionCounter, ENC_ICV, 0);
 				if (OPGP_ERROR_CHECK(status)) {
 					goto end;
 				}
-				status = calculate_enc_cbc_SCP03(secInfo->encryptionSessionKey,
+				status = calculate_enc_cbc_SCP03(secInfo->encryptionSessionKey, secInfo->keyLength,
 						wrappedApduCommand+5, wrappedLength-5-paddingSize-8, ENC_ICV, encryption, &encryptionLength);
 				if (OPGP_ERROR_CHECK(status)) {
 					goto end;
@@ -1607,7 +1623,7 @@ OPGP_ERROR_STATUS wrap_command(PBYTE apduCommand, DWORD apduCommandLength, PBYTE
 			secInfo->sessionEncryptionCounter++;
 		}
 		// wrappedLength-8: exclude size of MAC for CMAC
-		status = calculate_CMAC_aes(secInfo->C_MACSessionKey, wrappedApduCommand, wrappedLength-8, secInfo->lastC_MAC, mac);
+		status = calculate_CMAC_aes(secInfo->C_MACSessionKey, secInfo->keyLength, wrappedApduCommand, wrappedLength-8, secInfo->lastC_MAC, mac);
 		if (OPGP_ERROR_CHECK(status)) {
 			goto end;
 		}
@@ -1696,7 +1712,7 @@ end:
 
 OPGP_ERROR_STATUS validate_install_receipt(DWORD confirmationCounter, PBYTE cardUniqueData,
 							  DWORD cardUniqueDataLength,
-						   BYTE receiptKey[16], GP211_RECEIPT_DATA receiptData,
+						   BYTE receiptKey[32], DWORD keyLength, GP211_RECEIPT_DATA receiptData,
 						   PBYTE executableLoadFileAID, DWORD executableLoadFileAIDLength,
 						   PBYTE applicationAID, DWORD applicationAIDLength, BYTE secureChannelProtocol)
 {
@@ -1724,7 +1740,7 @@ OPGP_ERROR_STATUS validate_install_receipt(DWORD confirmationCounter, PBYTE card
 	validationData[i++] = (BYTE)applicationAIDLength;
 	memcpy(validationData, applicationAID, applicationAIDLength);
 	i+=applicationAIDLength;
-	status = validate_receipt(validationData, validationDataLength, receiptData.receipt, receiptKey, secureChannelProtocol);
+	status = validate_receipt(validationData, validationDataLength, receiptData.receipt, receiptKey, keyLength, secureChannelProtocol);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -1740,7 +1756,7 @@ end:
 
 OPGP_ERROR_STATUS validate_load_receipt(DWORD confirmationCounter, PBYTE cardUniqueData,
 						   DWORD cardUniqueDataLength,
-						   BYTE receiptKey[16], GP211_RECEIPT_DATA receiptData,
+						   BYTE receiptKey[32], DWORD keyLength, GP211_RECEIPT_DATA receiptData,
 						   PBYTE executableLoadFileAID, DWORD executableLoadFileAIDLength,
 						   PBYTE securityDomainAID, DWORD securityDomainAIDLength, BYTE secureChannelProtocol)
 {
@@ -1768,7 +1784,7 @@ OPGP_ERROR_STATUS validate_load_receipt(DWORD confirmationCounter, PBYTE cardUni
 	validationData[i++] = (BYTE)securityDomainAIDLength;
 	memcpy(validationData, securityDomainAID, securityDomainAIDLength);
 	i+=securityDomainAIDLength;
-	status = validate_receipt(validationData, validationDataLength, receiptData.receipt, receiptKey, secureChannelProtocol);
+	status = validate_receipt(validationData, validationDataLength, receiptData.receipt, receiptKey, keyLength, secureChannelProtocol);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -1830,7 +1846,7 @@ OPGP_ERROR_STATUS GP211_calculate_R_MAC(PBYTE apduCommand, DWORD apduCommandLeng
 		// append SW
 		memcpy(r_MacData+offset, responseApdu+responseApduLength-2, 2);
 		offset+=2;
-		status = calculate_CMAC_aes(secInfo->R_MACSessionKey, r_MacData, offset, secInfo->lastC_MAC, scp03_mac);
+		status = calculate_CMAC_aes(secInfo->R_MACSessionKey, secInfo->keyLength, r_MacData, offset, secInfo->lastC_MAC, scp03_mac);
 		if (OPGP_ERROR_CHECK(status)) {
 			goto end;
 		}
@@ -1878,11 +1894,11 @@ OPGP_ERROR_STATUS unwrap_command(PBYTE apduCommand, DWORD apduCommandLength, PBY
 			//warning status words (i.e. '62xx' and '63xx') shall be interpreted as error status words.
 			&& (sw == 0x9000 || (sw >> 8) == 0x62 || (sw >> 8) == 0x63)
 	) {
-		status = calculate_enc_icv_SCP03(secInfo->encryptionSessionKey, secInfo->sessionEncryptionCounter, ENC_ICV, 1);
+		status = calculate_enc_icv_SCP03(secInfo->encryptionSessionKey, secInfo->keyLength, secInfo->sessionEncryptionCounter, ENC_ICV, 1);
 		if (OPGP_ERROR_CHECK(status)) {
 			goto end;
 		}
-		status = calculate_dec_cbc_SCP03(secInfo->encryptionSessionKey, unwrappedResponseApdu,
+		status = calculate_dec_cbc_SCP03(secInfo->encryptionSessionKey, secInfo->keyLength, unwrappedResponseApdu,
 				*unwrappedResponseApduLength, ENC_ICV, decryption, &decryptionLength);
 		if (OPGP_ERROR_CHECK(status)) {
 			goto end;
@@ -2069,9 +2085,12 @@ end:
  * \param message [in] The message to generate the hash for.
  * \param messageLength [in] The length of the message buffer.
  * \param hash [out] The calculated hash.
+ * \param hashLength [in] The hash length for SCP03: 32 for AES-128, 48 for AES-192, 64 for AES-256.
  */
-OPGP_ERROR_STATUS calculate_sha256_hash(PBYTE message, DWORD messageLength, BYTE hash[32]) {
-	return calculate_hash(message, messageLength, hash, EVP_sha256());
+OPGP_ERROR_STATUS calculate_sha2_hash(PBYTE message, DWORD messageLength, BYTE hash[64], DWORD hashLength) {
+	return calculate_hash(message, messageLength, hash,
+			hashLength == 32 ? EVP_sha256() :
+					(hashLength == 48 ? EVP_sha384() : EVP_sha512()));
 }
 
 /**
