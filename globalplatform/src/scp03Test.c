@@ -434,46 +434,43 @@ static void get_status_enc_mac(void **state) {
 	assert_int_equal(executablesData[0].numExecutableModules, 0);
 }
 
-static void calculate_pseudo_random_challenge_aes_192(void **state) {
+static void mutual_auth_aes_192(void **state) {
 	OPGP_ERROR_STATUS status;
 	BYTE hostChallenge[8];
-	DWORD hostChallengeLen = 8, cardCryptogramLen = 8;
-	BYTE initializeUpdateRequest[APDU_COMMAND_LEN];
+	DWORD hostChallengeLen = 8;
+	BYTE initializeUpdateRequest[APDU_COMMAND_LEN], extAuthRequest[APDU_COMMAND_LEN];
 	DWORD initializeUpdateRequestLen, extAuthRequestLen;
 	initializeUpdateRequestLen = extAuthRequestLen = APDU_COMMAND_LEN;
 	BYTE initializeUpdateResponse[APDU_RESPONSE_LEN];
 	DWORD initializeUpdateResponseLen = APDU_RESPONSE_LEN;
 
-	BYTE macSessionKey[24];
-	BYTE cardCryptogramVer[8], cardCryptogram[8];
+	BYTE extAuthResponse[] = {0x90, 0x00};
+	DWORD extAuthResponseLen = sizeof(extAuthResponse);
+
 	BYTE key[] = {0xDE, 0x2A, 0x36, 0x29, 0xCB, 0xC2, 0x4E, 0x8D, 0x88, 0x69, 0xE8, 0x2C, 0x8B, 0x4C, 0x0D, 0x87, 0x4D, 0x88, 0x16, 0x6B, 0x6F, 0x8A, 0x1C, 0x12};
-
-	BYTE sequenceCounter[3];
-	BYTE cardChallenge[8];
-
-	BYTE calculatedCardChallenge[8];
 
 	securityInfo211.invokingAidLength = 16;
 	hex_to_byte_array("A000000151000000", securityInfo211.invokingAid, &securityInfo211.invokingAidLength);
 
-	hex_to_byte_array("80500000084B8912CF82B197B400", initializeUpdateRequest, &initializeUpdateRequestLen);
-	hex_to_byte_array("00008301A8186727A822020310A4B0CCBAAB1DDD9E73D36450CA82F2A90000029000", initializeUpdateResponse, &initializeUpdateResponseLen);
-	hex_to_byte_array("4B8912CF82B197B4", hostChallenge, &hostChallengeLen);
-	hex_to_byte_array("73D36450CA82F2A9", cardCryptogram, &cardCryptogramLen);
+	hex_to_byte_array("8050000008EB1FEF89F9507E6C00", initializeUpdateRequest, &initializeUpdateRequestLen);
+	hex_to_byte_array("00008301A8186727A8220203108D6C2EDFB723F72C678132B19338BA650000079000", initializeUpdateResponse, &initializeUpdateResponseLen);
+	hex_to_byte_array("8482030010501472F4BCDE8E7A7C38022C2E67A725", extAuthRequest, &extAuthRequestLen);
+	hex_to_byte_array("EB1FEF89F9507E6C", hostChallenge, &hostChallengeLen);
 
-	memcpy(cardChallenge, initializeUpdateResponse+13, 8);
-	memcpy(sequenceCounter, initializeUpdateResponse+29, 3);
+	will_return(__wrap_RAND_bytes, hostChallenge);
+	expect_value(__wrap_RAND_bytes, num, 8);
 
-	status = calculate_card_challenge_SCP03(key, sizeof(key), sequenceCounter, securityInfo211.invokingAid,
-			securityInfo211.invokingAidLength, calculatedCardChallenge);
-	assert_int_equal(status.errorStatus, OPGP_ERROR_STATUS_SUCCESS);
-	assert_memory_equal(calculatedCardChallenge, cardChallenge, 8);
+	expect_memory(send_APDU, capdu, initializeUpdateRequest, initializeUpdateRequestLen);
+	will_return(send_APDU, initializeUpdateResponse);
+	will_return(send_APDU, &initializeUpdateResponseLen);
 
-	status = create_session_key_SCP03(key, sizeof(key), 0x06, cardChallenge, hostChallenge, macSessionKey);
+	expect_memory(send_APDU, capdu, extAuthRequest, extAuthRequestLen);
+	will_return(send_APDU, extAuthResponse);
+	will_return(send_APDU, &extAuthResponseLen);
+
+	status = GP211_mutual_authentication(cardContext, cardInfo, NULL, key, key, key, sizeof(key), 0, 0,
+			GP211_SCP03, GP211_SCP03_IMPL_i10, GP211_SCP03_SECURITY_LEVEL_C_DEC_C_MAC, 0, &securityInfo211);
 	assert_int_equal(status.errorStatus, OPGP_ERROR_STATUS_SUCCESS);
-	status = calculate_card_cryptogram_SCP03(macSessionKey, sizeof(key), cardChallenge, hostChallenge, cardCryptogramVer);
-	assert_int_equal(status.errorStatus, OPGP_ERROR_STATUS_SUCCESS);
-	assert_memory_equal(cardCryptogram, cardCryptogramVer, 8);
 }
 
 static int setup(void **state) {
@@ -488,7 +485,7 @@ int main(void) {
 			cmocka_unit_test(mutual_auth),
 			cmocka_unit_test(get_status),
 			cmocka_unit_test(get_status_enc_mac),
-			cmocka_unit_test(calculate_pseudo_random_challenge_aes_192)
+			cmocka_unit_test(mutual_auth_aes_192)
 			//cmocka_unit_test(send_apdu_rmac_rencryption)
 	};
 	return cmocka_run_group_tests_name("SCP03", tests, setup, NULL);

@@ -290,7 +290,7 @@ end:
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
 OPGP_ERROR_STATUS calculate_enc_cbc_SCP03(BYTE key[32], DWORD keyLength, BYTE *message, DWORD messageLength,
-							  BYTE icv[32],
+							  BYTE icv[16],
 							  BYTE *encryption, DWORD *encryptionLength) {
 	OPGP_ERROR_STATUS status;
 	int result;
@@ -312,7 +312,7 @@ OPGP_ERROR_STATUS calculate_enc_cbc_SCP03(BYTE key[32], DWORD keyLength, BYTE *m
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
 	*encryptionLength += outl;
-	result = EVP_EncryptUpdate(ctx, encryption + *encryptionLength, &outl, AES_PADDING, (keyLength - messageLength % keyLength));
+	result = EVP_EncryptUpdate(ctx, encryption + *encryptionLength, &outl, AES_PADDING, (16 - messageLength % 16));
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -394,12 +394,12 @@ end:
  * \param forResponse 1 if the calculation is performed for the response.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_enc_icv_SCP03(BYTE key[32], DWORD keyLength, LONG sessionEncryptionCounter, BYTE icv[32], BOOL forResponse) {
+OPGP_ERROR_STATUS calculate_enc_icv_SCP03(BYTE key[32], DWORD keyLength, LONG sessionEncryptionCounter, BYTE icv[16], BOOL forResponse) {
 	OPGP_ERROR_STATUS status;
 	int result;
 	int outl;
 	EVP_CIPHER_CTX_define;
-	BYTE encryptionCounter[32];
+	BYTE encryptionCounter[16];
 	OPGP_LOG_START(_T("calculate_enc_icv_SCP03"));
 	ctx = EVP_CIPHER_CTX_create;
 	EVP_CIPHER_CTX_init(ctx);
@@ -410,16 +410,16 @@ OPGP_ERROR_STATUS calculate_enc_icv_SCP03(BYTE key[32], DWORD keyLength, LONG se
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
 	EVP_CIPHER_CTX_set_padding(ctx, 0);
-	memset(encryptionCounter, 0, keyLength);
-	encryptionCounter[keyLength-4] = (int)((sessionEncryptionCounter >> 24) & 0xFF) ;
-	encryptionCounter[keyLength-3] = (int)((sessionEncryptionCounter >> 16) & 0xFF) ;
-	encryptionCounter[keyLength-2] = (int)((sessionEncryptionCounter >> 8) & 0XFF);
-	encryptionCounter[keyLength-1] = (int)((sessionEncryptionCounter & 0XFF));
+	memset(encryptionCounter, 0, 16);
+	encryptionCounter[16-4] = (int)((sessionEncryptionCounter >> 24) & 0xFF) ;
+	encryptionCounter[16-3] = (int)((sessionEncryptionCounter >> 16) & 0xFF) ;
+	encryptionCounter[16-2] = (int)((sessionEncryptionCounter >> 8) & 0XFF);
+	encryptionCounter[16-1] = (int)((sessionEncryptionCounter & 0XFF));
 	if (forResponse) {
-		encryptionCounter[keyLength-4] |= 0x80;
+		encryptionCounter[16-4] |= 0x80;
 	}
 
-	result = EVP_EncryptUpdate(ctx, icv, &outl, encryptionCounter, keyLength);
+	result = EVP_EncryptUpdate(ctx, icv, &outl, encryptionCounter, 16);
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
@@ -1524,7 +1524,7 @@ OPGP_ERROR_STATUS wrap_command(PBYTE apduCommand, DWORD apduCommandLength, PBYTE
 			) {
 
 		if (secInfo->secureChannelProtocol == GP211_SCP03) {
-			blockSize = secInfo->keyLength;
+			blockSize = 16;
 		}
 		// compute size of APDU with enc padding + MAC
 		// padding 0x80 at least added or in SCP a length byte is prepended
