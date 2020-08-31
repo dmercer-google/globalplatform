@@ -1747,7 +1747,7 @@ OPGP_ERROR_STATUS GP211_get_secure_channel_protocol_details(OPGP_CARD_CONTEXT ca
 	while (i < cardData.scpLength) {
 		// only supporting SCP01 - SCP03
 		if (cardData.scp[i] == GP211_SCP01 || cardData.scp[i] == GP211_SCP02 || cardData.scp[i] == GP211_SCP03) {
-			*secureChannelProtocol = cardData.scp[i++];
+			*secureChannelProtocol = cardData.scp[i];
 			*secureChannelProtocolImpl = cardData.scpImpl[i++];
 			OPGP_log_Msg(_T("Using Secure Channel Protocol 0x%02x with Secure Channel Protocol Impl: 0x%02x\n"), *secureChannelProtocol, *secureChannelProtocolImpl);
 			goto found;
@@ -4366,7 +4366,7 @@ OPGP_ERROR_STATUS mutual_authentication(OPGP_CARD_CONTEXT cardContext, OPGP_CARD
 				memcpy(secInfo->invokingAid, GP231_ISD_AID, sizeof(GP231_ISD_AID));
 				secInfo->invokingAidLength = sizeof(GP231_ISD_AID);
 			}
-			status = calculate_card_challenge_SCP03(sEnc, 16, sequenceCounter, secInfo->invokingAid, secInfo->invokingAidLength, calculatedCardChallenge);
+			status = calculate_card_challenge_SCP03(sEnc, keyLength, sequenceCounter, secInfo->invokingAid, secInfo->invokingAidLength, calculatedCardChallenge);
 			if (OPGP_ERROR_CHECK(status)) {
 				goto end;
 			}

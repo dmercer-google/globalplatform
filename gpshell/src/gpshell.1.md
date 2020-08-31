@@ -59,7 +59,7 @@ __card_connect__ -readerNumber *x*
 
 :    Connect to card in the *x* th reader in the system
 
-__open_sc__ -keyind *x* -keyver *x* -key *key* -mac_key *mac-key* -enc_key *enc-key* -kek_key *kek-key* -security *securityLevel* -scp *protocol* -scpimpl *impl* -keyDerivation *derivation*
+__open_sc__ -keyind *x* -keyver *x* -key *key* -mac_key *mac-key* -enc_key *enc-key* -kek_key *kek-key* -security *securityLevel* -scp *protocol* -scpimpl *impl* -keyDerivation *derivation* -keyLength *keyLength*
 
 :    Open a secure channel
 
@@ -71,6 +71,8 @@ If the card supports a Secure Channel Protocol Implementation with only one base
 
 If the card uses a key derivation mechanism you must enable the derivation mode with the -keyDerivation option and you must specify with -key the master (mother) key. -kek_key, -mac_key and -enc_key are not relevant is this case. See the section Options and Key Derivation.
 __NOTE:__ If the secure channel is going to be opened when no security domain is selected then the command  get_secure_channel_protocol_details must be executed before to be able to get the Secure Channel Protocol Implementation.
+
+-keyLength is only needed for SCP03 and only if a AES-256 or AES-192 bit key is used.
 
 __select__ -AID *AID*
 
@@ -216,6 +218,10 @@ __-kek_key__ *key*
 __-security__ *x*
 
 :    0: clear, 1: MAC, 3: MAC+ENC, 51: MAC+ENC+R-MAC+E-ENC (SCP03 only), 19: MAC+ENC-R-MAC (SCP02+SCP03 only), 17: MAC+R-MAC (SCP02+SCP03 only)
+
+__-keyLength__ *x*
+
+:    The key length of the key, enc_key, mac_key and kex_key in case SCP03 is used. The default are 16 bytes (AES-128), but SCP03 can also use 24 (AES-192) and 32 bytes (AES-256)
 
 __-reader__ *readerName*
 

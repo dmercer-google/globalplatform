@@ -70,7 +70,7 @@ OPGP_ERROR_STATUS calculate_enc_cbc(BYTE key[16], BYTE *message, DWORD messageLe
 							  BYTE *encryption, DWORD *encryptionLength);
 
 OPGP_NO_API
-OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[16], DWORD keyLength, BYTE *message, DWORD messageLength, BYTE mac[16]);
+OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[32], DWORD keyLength, BYTE *message, DWORD messageLength, BYTE mac[16]);
 
 /**
     * Calculates the a cryptogram for multiple SCP03 operation like host cryptogram, card cryptogram and card challenge calculation.
@@ -784,7 +784,7 @@ OPGP_ERROR_STATUS create_session_key_SCP03(BYTE key[32], DWORD keyLength, BYTE d
 							   BYTE hostChallenge[8], BYTE sessionKey[32]) {
 	OPGP_ERROR_STATUS status;
 	OPGP_LOG_START(_T("create_session_key_SCP03"));
-	status = calculate_cryptogram_SCP03(key, keyLength, derivationConstant, hostChallenge, 8, cardChallenge, 8, sessionKey, keyLength);
+	status = calculate_cryptogram_SCP03(key, keyLength, derivationConstant, hostChallenge, 8, cardChallenge, 8, sessionKey, 128);
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -986,7 +986,7 @@ end:
  * \param mac [out] The calculated MAC.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
  */
-OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[32], DWORD keyLength, BYTE *message, DWORD messageLength, BYTE mac[32]) {
+OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[32], DWORD keyLength, BYTE *message, DWORD messageLength, BYTE mac[16]) {
 	LONG result;
 	OPGP_ERROR_STATUS status;
 	size_t outl;
