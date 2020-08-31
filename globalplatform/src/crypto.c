@@ -81,7 +81,7 @@ OPGP_ERROR_STATUS calculate_MAC_aes(BYTE key[32], DWORD keyLength, BYTE *message
     * \param context1 [in] The context1 for the internal key derivation.
 	* \param context1Length [in] The length of the context1 buffer.
     * \param context2 [in] The context2 for the internal key derivation.
-	* \param context2Length [in] The length of the context3 buffer.
+	* \param context2Length [in] The length of the context2 buffer.
 	* \param cryptogram [out] The calculated cryptogram. Must be large enough to hold the result. For session keys this is 128 bits, 64 bits otherwise.
     * \param cryptogramSize [in] The result size in bits of the cryptogram. Must be a multiple of 8.
     * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code and error message are contained in the OPGP_ERROR_STATUS struct
@@ -91,13 +91,14 @@ OPGP_ERROR_STATUS calculate_cryptogram_SCP03(BYTE key[32], DWORD keyLength, cons
 		OPGP_ERROR_STATUS status;
 		BYTE derivationData[48];
 		BYTE mac[16];
-		DWORD derivationDatLength = 16 + context1Length + context2Length;
+		DWORD i;
+		DWORD derivationDataLength = 16 + context1Length + context2Length;
 		OPGP_LOG_START(_T("calculate_cryptogram_SCP03"));
 
 		memset(derivationData, 0, 48);
 
 		// sanity check, this should never be more than 48 bytes
-		if (derivationDatLength > 48) {
+		if (derivationDataLength > 48) {
 			{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_INSUFFICIENT_BUFFER, OPGP_stringify_error(OPGP_ERROR_INSUFFICIENT_BUFFER)); goto end; }
 		}
 		derivationData[11] = derivationConstant; //<! "derivation constant" part of label
@@ -109,21 +110,20 @@ OPGP_ERROR_STATUS calculate_cryptogram_SCP03(BYTE key[32], DWORD keyLength, cons
 			derivationData[13] = 0x00; // <! First byte of output length
 		}
 		derivationData[14] = (BYTE) (cryptogramSize & 0x00FF); // <! Second byte of output length
-		if (cryptogramSize >= 0xC0) {
-			derivationData[15] = 0x02; // <! byte counter "i"
-		}
-		else {
-			derivationData[15] = 0x01; // <! byte counter "i"
-		}
 
 		memcpy(derivationData + 16, context1, context1Length);
 		memcpy(derivationData + 16 + context1Length, context2, context2Length);
 
-		status = calculate_MAC_aes(key, keyLength, derivationData, derivationDatLength, mac);
-		if (OPGP_ERROR_CHECK(status)) {
-			goto end;
+		// support AES > 128 bits, 16 is AES block size
+		for (i=0; i<(cryptogramSize/8)/16 + ((cryptogramSize/8) % 16 > 0 ? 1 : 0); i++) {
+			derivationData[15] = i+1; // <! byte counter "i"
+			status = calculate_MAC_aes(key, keyLength, derivationData, derivationDataLength, mac);
+			if (OPGP_ERROR_CHECK(status)) {
+				goto end;
+			}
+			// copy block size
+			memcpy(cryptogram + 16*i, mac, (cryptogramSize/8 > 16 ? 16 : cryptogramSize/8));
 		}
-		memcpy(cryptogram, mac, cryptogramSize/8);
 
 		{ OPGP_ERROR_CREATE_NO_ERROR(status); goto end; }
 end:
@@ -783,11 +783,15 @@ end:
 OPGP_ERROR_STATUS create_session_key_SCP03(BYTE key[32], DWORD keyLength, BYTE derivationConstant, BYTE cardChallenge[8],
 							   BYTE hostChallenge[8], BYTE sessionKey[32]) {
 	OPGP_ERROR_STATUS status;
+	BYTE _sessionKey[32];
 	OPGP_LOG_START(_T("create_session_key_SCP03"));
-	status = calculate_cryptogram_SCP03(key, keyLength, derivationConstant, hostChallenge, 8, cardChallenge, 8, sessionKey, 128);
+
+	status = calculate_cryptogram_SCP03(key, keyLength, derivationConstant, hostChallenge, 8, cardChallenge, 8, _sessionKey,
+			keyLength == 16 ? 128 : (keyLength == 24 ? 192 : 256));
 	if (OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
+	memcpy(sessionKey, _sessionKey, keyLength);
 	{ OPGP_ERROR_CREATE_NO_ERROR(status); goto end; }
 end:
 

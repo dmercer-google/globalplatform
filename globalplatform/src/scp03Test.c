@@ -474,7 +474,6 @@ static void calculate_pseudo_random_challenge_aes_192(void **state) {
 	status = calculate_card_cryptogram_SCP03(macSessionKey, sizeof(key), cardChallenge, hostChallenge, cardCryptogramVer);
 	assert_int_equal(status.errorStatus, OPGP_ERROR_STATUS_SUCCESS);
 	assert_memory_equal(cardCryptogram, cardCryptogramVer, 8);
-
 }
 
 static int setup(void **state) {
