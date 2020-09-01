@@ -434,7 +434,7 @@ static void get_status_enc_mac(void **state) {
 	assert_int_equal(executablesData[0].numExecutableModules, 0);
 }
 
-static void mutual_auth_aes_192(void **state) {
+static void get_status_aes_192(void **state) {
 	OPGP_ERROR_STATUS status;
 	BYTE hostChallenge[8];
 	DWORD hostChallengeLen = 8;
@@ -447,15 +447,27 @@ static void mutual_auth_aes_192(void **state) {
 	BYTE extAuthResponse[] = {0x90, 0x00};
 	DWORD extAuthResponseLen = sizeof(extAuthResponse);
 
+	DWORD refAidLen = 16;
+	BYTE refAid[16];
+	DWORD dataLength;
+	GP211_APPLICATION_DATA appData[1];
+
 	BYTE key[] = {0xDE, 0x2A, 0x36, 0x29, 0xCB, 0xC2, 0x4E, 0x8D, 0x88, 0x69, 0xE8, 0x2C, 0x8B, 0x4C, 0x0D, 0x87, 0x4D, 0x88, 0x16, 0x6B, 0x6F, 0x8A, 0x1C, 0x12};
+
+	OPGP_CSTRING commands[] = {
+				"84F2200218110C222888859059700E5D42AD65F41299B0BFFC03BF79A800"
+	};
+	OPGP_CSTRING responses[] = {
+				"E30D4F07A00000015153509F7001019000"
+	};
 
 	securityInfo211.invokingAidLength = 16;
 	hex_to_byte_array("A000000151000000", securityInfo211.invokingAid, &securityInfo211.invokingAidLength);
 
-	hex_to_byte_array("8050000008EB1FEF89F9507E6C00", initializeUpdateRequest, &initializeUpdateRequestLen);
-	hex_to_byte_array("00008301A8186727A8220203108D6C2EDFB723F72C678132B19338BA650000079000", initializeUpdateResponse, &initializeUpdateResponseLen);
-	hex_to_byte_array("8482030010501472F4BCDE8E7A7C38022C2E67A725", extAuthRequest, &extAuthRequestLen);
-	hex_to_byte_array("EB1FEF89F9507E6C", hostChallenge, &hostChallengeLen);
+	hex_to_byte_array("80500000084157115CAD7D2FE700", initializeUpdateRequest, &initializeUpdateRequestLen);
+	hex_to_byte_array("00008301A8186727A822020310726B1E22EED4F4BBAB21001BFD4B6F020000129000", initializeUpdateResponse, &initializeUpdateResponseLen);
+	hex_to_byte_array("84820300109B126D1B1557297F3C06766CA9ACBD27", extAuthRequest, &extAuthRequestLen);
+	hex_to_byte_array("4157115CAD7D2FE7", hostChallenge, &hostChallengeLen);
 
 	will_return(__wrap_RAND_bytes, hostChallenge);
 	expect_value(__wrap_RAND_bytes, num, 8);
@@ -471,6 +483,19 @@ static void mutual_auth_aes_192(void **state) {
 	status = GP211_mutual_authentication(cardContext, cardInfo, NULL, key, key, key, sizeof(key), 0, 0,
 			GP211_SCP03, GP211_SCP03_IMPL_i10, GP211_SCP03_SECURITY_LEVEL_C_DEC_C_MAC, 0, &securityInfo211);
 	assert_int_equal(status.errorStatus, OPGP_ERROR_STATUS_SUCCESS);
+
+	enqueue_commands(commands, responses, 1);
+
+	dataLength = 8;
+	status = GP211_get_status(cardContext, cardInfo, &securityInfo211, GP211_STATUS_LOAD_FILES,
+				GP211_STATUS_FORMAT_NEW, appData, NULL, &dataLength);
+	assert_int_equal(status.errorStatus, OPGP_ERROR_STATUS_SUCCESS);
+
+	refAidLen = 16;
+	hex_to_byte_array("a0000001515350", refAid, &refAidLen);
+	assert_int_equal(dataLength, 1);
+	assert_int_equal(appData[0].aid.AIDLength, 7);
+	assert_memory_equal(appData[0].aid.AID, refAid, refAidLen);
 }
 
 static int setup(void **state) {
@@ -485,7 +510,7 @@ int main(void) {
 			cmocka_unit_test(mutual_auth),
 			cmocka_unit_test(get_status),
 			cmocka_unit_test(get_status_enc_mac),
-			cmocka_unit_test(mutual_auth_aes_192)
+			cmocka_unit_test(get_status_aes_192)
 			//cmocka_unit_test(send_apdu_rmac_rencryption)
 	};
 	return cmocka_run_group_tests_name("SCP03", tests, setup, NULL);

@@ -487,12 +487,12 @@ OPGP_ERROR_STATUS GP211_pin_change(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO
 //! \brief GlobalPlatform2.1.1: replaces a single symmetric key in a key set or adds a new key.
 OPGP_API
 OPGP_ERROR_STATUS GP211_put_symmetric_key(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardInfo, GP211_SECURITY_INFO *secInfo,
-				  BYTE keySetVersion, BYTE keyIndex, BYTE newKeySetVersion, BYTE key[16], BYTE keyType);
+				  BYTE keySetVersion, BYTE keyIndex, BYTE newKeySetVersion, BYTE key[32], DWORD keyLength, BYTE keyType);
 
 //! \brief GlobalPlatform2.1.1: replaces a single AES key in a key set or adds a new AES key.
 OPGP_API
 OPGP_ERROR_STATUS GP211_put_aes_key(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardInfo, GP211_SECURITY_INFO *secInfo,
-				  BYTE keySetVersion, BYTE keyIndex, BYTE newKeySetVersion, BYTE aesKey[16]);
+				  BYTE keySetVersion, BYTE keyIndex, BYTE newKeySetVersion, BYTE aesKey[32], DWORD keyLength);
 
 //! \brief GlobalPlatform2.1.1: replaces a single 3DES key in a key set or adds a new 3DES key.
 OPGP_API
@@ -649,7 +649,7 @@ OPGP_ERROR_STATUS GP211_put_delegated_management_keys(OPGP_CARD_CONTEXT cardCont
 								   BYTE keySetVersion,
 								   BYTE newKeySetVersion,
 								   OPGP_STRING PEMKeyFileName, char *passPhrase,
-								   BYTE receiptKey[16]);
+								   BYTE receiptKey[32], DWORD keyLength);
 
 //! \brief Sends an application protocol data unit.
 OPGP_API

@@ -97,7 +97,7 @@ OPGP_NO_API
 OPGP_ERROR_STATUS put_delegated_management_keys(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardInfo, GP211_SECURITY_INFO *secInfo,
 								   BYTE keySetVersion, BYTE newKeySetVersion,
 								   OPGP_STRING PEMKeyFileName, char *passPhrase,
-								   BYTE receiptKey[16]);
+								   BYTE receiptKey[32], DWORD keyLength);
 
 OPGP_NO_API
 OPGP_ERROR_STATUS put_3des_key(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardInfo, GP211_SECURITY_INFO *secInfo,
@@ -827,7 +827,7 @@ OPGP_ERROR_STATUS put_3des_key(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO car
 	else {
 		keyType = GP211_KEY_TYPE_DES;
 	}
-	status = GP211_put_symmetric_key(cardContext, cardInfo, secInfo, keySetVersion, keyIndex, newKeySetVersion, _3DESKey, keyType);
+	status = GP211_put_symmetric_key(cardContext, cardInfo, secInfo, keySetVersion, keyIndex, newKeySetVersion, _3DESKey, 16, keyType);
 	OPGP_LOG_END(_T("put_3des_key"), status);
 	return status;
 }
@@ -844,18 +844,20 @@ OPGP_ERROR_STATUS put_3des_key(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO car
  * \param keyIndex [in] The position of the key in the key set version.
  * \param newKeySetVersion [in] The new key set version.
  * \param aesKey [in] The new AES key.
+ * \param keyLength [in] The key length. 16, 24 or 32 bytes.
  */
 OPGP_ERROR_STATUS GP211_put_aes_key(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardInfo, GP211_SECURITY_INFO *secInfo,
-				  BYTE keySetVersion, BYTE keyIndex, BYTE newKeySetVersion, BYTE aesKey[16]) {
+				  BYTE keySetVersion, BYTE keyIndex, BYTE newKeySetVersion, BYTE aesKey[32], DWORD keyLength) {
 	OPGP_LOG_START(_T("GP211_put_aes_key"));
 	OPGP_ERROR_STATUS status;
-	status = GP211_put_symmetric_key(cardContext, cardInfo, secInfo, keySetVersion, keyIndex, newKeySetVersion, aesKey, GP211_KEY_TYPE_AES);
+	status = GP211_put_symmetric_key(cardContext, cardInfo, secInfo, keySetVersion, keyIndex, newKeySetVersion, aesKey,
+			keyLength, GP211_KEY_TYPE_AES);
 	OPGP_LOG_END(_T("GP211_put_aes_key"), status);
 	return status;
 }
 
 OPGP_ERROR_STATUS GP211_put_symmetric_key(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardInfo, GP211_SECURITY_INFO *secInfo,
-				  BYTE keySetVersion, BYTE keyIndex, BYTE newKeySetVersion, BYTE key[16], BYTE keyType) {
+				  BYTE keySetVersion, BYTE keyIndex, BYTE newKeySetVersion, BYTE key[32], DWORD keyLength, BYTE keyType) {
 	OPGP_ERROR_STATUS status;
 	BYTE sendBuffer[APDU_COMMAND_LEN];
 	DWORD sendBufferLength = APDU_COMMAND_LEN;
@@ -905,7 +907,7 @@ end:
 OPGP_ERROR_STATUS put_delegated_management_keys(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardInfo, GP211_SECURITY_INFO *secInfo,
 								   BYTE keySetVersion, BYTE newKeySetVersion,
 								   OPGP_STRING PEMKeyFileName, char *passPhrase,
-								   BYTE receiptKey[16]) {
+								   BYTE receiptKey[32], DWORD keyLength) {
 	OPGP_ERROR_STATUS status;
 	BYTE sendBuffer[APDU_COMMAND_LEN];
 	DWORD sendBufferLength = 0;
@@ -973,7 +975,7 @@ OPGP_ERROR_STATUS put_delegated_management_keys(OPGP_CARD_CONTEXT cardContext, O
 		keyType = GP211_KEY_TYPE_DES;
 	}
 
-	status = get_key_data_field(secInfo, receiptKey, 16, keyType, 1, keyDataField, &keyDataFieldLength, keyCheckValue);
+	status = get_key_data_field(secInfo, receiptKey, keyLength, keyType, 1, keyDataField, &keyDataFieldLength, keyCheckValue);
 	if ( OPGP_ERROR_CHECK(status)) {
 		goto end;
 	}
@@ -1044,8 +1046,8 @@ OPGP_ERROR_STATUS put_secure_channel_keys(OPGP_CARD_CONTEXT cardContext, OPGP_CA
 							 BYTE newS_ENC[16],
 							 BYTE newS_MAC[16], BYTE newDEK[16]) {
 	OPGP_ERROR_STATUS status;
-	BYTE sendBuffer[73];
-	DWORD sendBufferLength = 73;
+	BYTE sendBuffer[255];
+	DWORD sendBufferLength = 255;
 	DWORD recvBufferLength = APDU_RESPONSE_LEN;
 	BYTE recvBuffer[APDU_RESPONSE_LEN];
 	BYTE keyDataField[255];
@@ -1153,20 +1155,21 @@ end:
  * \param PEMKeyFileName [in] A PEM file name with the public RSA key.
  * \param *passPhrase [in] The passphrase. Must be an ASCII string.
  * \param receiptKey [in] The new Receipt Generation key.
+ * \param keyLength [in] The receipt key length. 16, 24 or 32 bytes.
  * \return OPGP_ERROR_STATUS struct with error status OPGP_ERROR_STATUS_SUCCESS if no error occurs, otherwise error code  and error message are contained in the OPGP_ERROR_STATUS struct
  */
 OPGP_ERROR_STATUS GP211_put_delegated_management_keys(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardInfo, GP211_SECURITY_INFO *secInfo,
 								   BYTE keySetVersion, BYTE newKeySetVersion,
 								   OPGP_STRING PEMKeyFileName, char *passPhrase,
-								   BYTE receiptKey[16]) {
+								   BYTE receiptKey[32], DWORD keyLength) {
 	return put_delegated_management_keys(cardContext, cardInfo, secInfo,
 								   keySetVersion, newKeySetVersion,
 								   PEMKeyFileName, passPhrase,
-								   receiptKey);
+								   receiptKey, keyLength);
 }
 
 /**
- * If keyIndex is 0xFF (=-1) all keys within a keySetVersion are deleted.
+ * If keyIndex is 0xFF all keys within a keySetVersion are deleted.
  * If keySetVersion is 0x00 all keys with the specified keyIndex are deleted.
  * \param cardContext [in] The valid OPGP_CARD_CONTEXT returned by OPGP_establish_context()
  * \param cardInfo [in] The OPGP_CARD_INFO structure returned by OPGP_card_connect().
@@ -1196,7 +1199,7 @@ OPGP_ERROR_STATUS delete_key(OPGP_CARD_CONTEXT cardContext, OPGP_CARD_INFO cardI
 	sendBuffer[i++] = 0x80;
 	sendBuffer[i++] = 0xE4;
 	sendBuffer[i++] = 0x00;
-	sendBuffer[i++] = 0x00;
+	sendBuffer[i++] = 0x80;
 	if (keySetVersion == 0x00) {
 		sendBuffer[i++] = 0x03;
 		sendBuffer[i++] = 0xD0;
@@ -1818,7 +1821,7 @@ OPGP_ERROR_STATUS get_key_information_templates(OPGP_CARD_CONTEXT cardContext, O
 		BOOL extended = 0;
 		DWORD j = 0;
 		// parse C0
-		result = read_TLV(tlv1.value, tlv1.length, &tlv2);
+		result = read_TLV(tlv1.value+offset, tlv1.length, &tlv2);
 		if (result == -1 || tlv2.tag != 0xC0) {
 			OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_INVALID_RESPONSE_DATA, OPGP_stringify_error(OPGP_ERROR_INVALID_RESPONSE_DATA));
 			goto end;
@@ -5081,7 +5084,7 @@ OPGP_ERROR_STATUS OP201_put_delegated_management_keys(OPGP_CARD_CONTEXT cardCont
 	GP211_SECURITY_INFO gp211secInfo;
 	mapOP201ToGP211SecurityInfo(*secInfo, &gp211secInfo);
 	status = put_delegated_management_keys(cardContext, cardInfo, &gp211secInfo, keySetVersion, newKeySetVersion,
-		PEMKeyFileName, passPhrase, receiptGenerationKey);
+		PEMKeyFileName, passPhrase, receiptGenerationKey, 16);
 	mapGP211ToOP201SecurityInfo(gp211secInfo, secInfo);
 	return status;
 }

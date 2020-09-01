@@ -259,7 +259,7 @@ OPGP_ERROR_STATUS calculate_enc_cbc_SCP03_min_padding(BYTE key[32], DWORD keyLen
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}
 	*encryptionLength += outl;
-	result = EVP_EncryptUpdate(ctx, encryption + *encryptionLength, &outl, AES_PADDING, ((keyLength - (messageLength % keyLength)) % 16));
+	result = EVP_EncryptUpdate(ctx, encryption + *encryptionLength, &outl, AES_PADDING, ((16 - (messageLength % 16)) % 16));
 	if (result != 1) {
 		{ OPGP_ERROR_CREATE_ERROR(status, OPGP_ERROR_CRYPT, OPGP_stringify_error(OPGP_ERROR_CRYPT)); goto end; }
 	}

@@ -130,16 +130,20 @@ __release_context__
 
 :    Release context
 
-__put_sc_key__ -keyver *keyver* -newkeyver *newkeyver* -mac_key *new_MAC_key* -enc_key *new_ENC_key* -kek_key *new_KEK_key*
+__put_sc_key__ -keyver *keyver* -newkeyver *newkeyver* -keyLength *keyLength* -mac_key *new_MAC_key* -enc_key *new_ENC_key* -kek_key *new_KEK_key*
 
 :    Add or replace a key set version
 
 If a new key set version is to be added *keyver* must be set to 0.
 If *keyver* equals *newkeyver* an existing key version is replaced.
 
-__put_sc_key__ -keyver *keyver* -newkeyver *newkeyver* -key *key* -keyDerivation "derivation"
+-keyLength is only needed for SCP03 and only if a AES-256 or AES-192 bit key is used.
+
+__put_sc_key__ -keyver *keyver* -newkeyver *newkeyver* -keyLength *keyLength* -key *key* -keyDerivation "derivation"
 
 :    Replace key set version *keyver* using key derivation *derivation* using the master (mother) key *y*
+
+-keyLength is only needed for SCP03 and only if a AES-256 or AES-192 bit key is used.
 
 __put_dm_keys__ -keyver *keyver* -newkeyver *newkeyver* -file *public_rsa_key_file* -pass *password* -key *new_receipt_generation_key*
 
@@ -185,6 +189,11 @@ __get_card_recognition_data__
 
 :     A GET DATA command returning the card recognition data. __NOTE:__ The security domain must be selected.
 
+__delete_key__ -keyver *keyver* -keyind *keyind*
+
+:     Deletes a key set version with a DELETE command. 
+If only the keyver is passed the complete key set version is deleted.
+By default keyind is 0xFF. If keyver is 0 all key set with keyind are deleted.
 
 # OPTIONS
 

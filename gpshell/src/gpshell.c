@@ -517,7 +517,7 @@ static int handleOptions(OptionStr *pOptionStr)
     int rv = EXIT_SUCCESS;
     TCHAR *token;
 
-    pOptionStr->keyIndex = 0;
+    pOptionStr->keyIndex = 0xFF;
     pOptionStr->keySetVersion = 0;
     pOptionStr->newKeySetVersion = 0;
     pOptionStr->securityLevel = 0;
@@ -1834,7 +1834,8 @@ static int handleCommands(FILE *fd)
                             optionStr.newKeySetVersion,
                             optionStr.file,
                             optionStr.passPhrase,
-                            optionStr.key);
+                            optionStr.key,
+							optionStr.keyLength);
                 }
 
                 if (OPGP_ERROR_CHECK(status))
