@@ -10,3 +10,4 @@ cd ..
 cd gppcscconnectionplugin
 $(${CMD})
 cd ..
+find . -name CMakeFiles -exec rm -rf {} \;
