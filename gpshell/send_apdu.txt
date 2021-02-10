@@ -2,6 +2,8 @@ establish_context
 enable_trace
 enable_timer
 card_connect
-send_apdu -sc 0 -APDU 00a4040007a0000000030000
+# send_apdu -sc 0 -APDU 00a4040007a0000000030000
+send_apdu -sc 0 -APDU 00A404000BA00000030800001000010000
+send_apdu -sc 0 -APDU 00CB3FFF055C035FC10200
 card_disconnect
 release_context

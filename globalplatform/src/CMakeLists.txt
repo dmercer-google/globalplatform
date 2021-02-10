@@ -6,6 +6,9 @@ INCLUDE(FindZLIB)
 
 SET(SOURCES connection.c stringify.c crypto.c loadfile.c util.c debug.c globalplatform.c)
 
+set(DEBUG 1)
+set(CMAKE_BUILD_TYPE "Debug")
+
 # TODO: if "Release" is set, package_ubuntu does only honor INSTALL(TARGETS globalplatform LIBRARY DESTINATION lib${LIB_SUFFIX})
 
 INCLUDE(CheckCCompilerFlag)

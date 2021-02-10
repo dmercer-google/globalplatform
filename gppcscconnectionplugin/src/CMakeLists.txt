@@ -5,6 +5,9 @@ SET(SOURCES gppcscconnectionplugin.c "${PROJECT_SOURCE_DIR}/../globalplatform/sr
 INCLUDE(CheckCCompilerFlag)
 INCLUDE(CMakePushCheckState)
 
+set(DEBUG 1)
+set(CMAKE_BUILD_TYPE "Debug")
+
 IF(DEBUG)
   SET(CMAKE_BUILD_TYPE "Debug")
   IF(MSVC_VERSION)
